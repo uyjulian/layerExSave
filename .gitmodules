@@ -1,3 +1,6 @@
 [submodule "external/zlib"]
 	path = external/zlib
 	url = https://github.com/krkrz/zlib.git
+[submodule "external/ncbind"]
+	path = external/ncbind
+	url = ../ncbind
