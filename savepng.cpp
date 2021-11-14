@@ -309,7 +309,7 @@ static unsigned CustomDeflate(unsigned char** out, size_t* outsize,
 							  const unsigned char* in, size_t insize,
 							  const LodePNGCompressSettings* settings)
 {
-	int comp_lv = settings ? (int)settings->custom_context : 1; //Z_DEFAULT_COMPRESSION;
+	tjs_intptr_t comp_lv = settings ? (tjs_intptr_t)settings->custom_context : 1; //Z_DEFAULT_COMPRESSION;
 
 	std::vector<BYTE> data;
 	long size = PngChunk::Deflate(data, in, insize, comp_lv);
@@ -368,9 +368,9 @@ void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, i
 
 			// compression level
 			if (dic.HasValue(TJS_W("comp_lv"))) {
-				int comp_lv = (int)dic.getIntValue(TJS_W("comp_lv"), Z_DEFAULT_COMPRESSION);
+				tjs_int64 comp_lv = (tjs_int64)dic.getIntValue(TJS_W("comp_lv"), Z_DEFAULT_COMPRESSION);
 				state.encoder.zlibsettings.custom_zlib = &CustomDeflate;
-				state.encoder.zlibsettings.custom_context = (void*)comp_lv;
+				state.encoder.zlibsettings.custom_context = (void*)(tjs_intptr_t)comp_lv;
 				if (!comp_lv) state.encoder.filter_strategy = LFS_ZERO;
 			}
 		}
@@ -404,7 +404,7 @@ void CompressPNG::encodeToOctet(iTJSDispatch2 *layer, tTJSVariant *vclv, tTJSVar
 		lodepng::State state;
 		SetInitialState(state, alpha);
 		if (vclv) {
-			int comp_lv = -1;
+			tjs_int64 comp_lv = -1;
 			if (vclv->Type() == tvtObject) {
 				PngChunk chunk;
 				ncbPropAccessor dic(vclv->AsObjectNoAddRef());
@@ -413,11 +413,11 @@ void CompressPNG::encodeToOctet(iTJSDispatch2 *layer, tTJSVariant *vclv, tTJSVar
 				SetCustomChunk(state, chunk, ChunkSetOffsXY(dic, chunk));
 				SetCustomChunk(state, chunk, ChunkSetVpagWH(dic, chunk));
 			} else {
-				comp_lv = (int)vclv->AsInteger();
+				comp_lv = (tjs_int64)vclv->AsInteger();
 			}
 			if (comp_lv >= 0) {
 				state.encoder.zlibsettings.custom_zlib = &CustomDeflate;
-				state.encoder.zlibsettings.custom_context = (void*)comp_lv;
+				state.encoder.zlibsettings.custom_context = (void*)(tjs_intptr_t)comp_lv;
 				if (!comp_lv) state.encoder.filter_strategy = LFS_ZERO;
 			}
 		}
