@@ -1,4 +1,4 @@
-#include "ncbind/ncbind.hpp"
+#include "ncbind.hpp"
 #include "savetlg5.hpp"
 
 #include <tlg5/slide.h>

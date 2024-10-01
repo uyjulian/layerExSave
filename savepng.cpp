@@ -1,7 +1,11 @@
-#include "ncbind/ncbind.hpp"
+#include "ncbind.hpp"
 #include "savepng.hpp"
 
+#if 1
 #include "zlib/zlib.h"
+#else
+#include "zlib.h"
+#endif
 
 #define PNGTYPE_RGBA8888 (0x08060000L)
 
@@ -281,7 +285,11 @@ void CompressPNG::encodeToOctet(iTJSDispatch2 *layer, tTJSVariant *vclv, tTJSVar
 
 #pragma message( ": LodePNG used." )
 
+#if 1
 #include "lodepng.h"
+#else
+#include "LodePNG/lodepng.h"
+#endif
 
 static bool MakeVectorImage(iTJSDispatch2 *layer, std::vector<unsigned char> &image, long &width, long &height, bool &alpha)
 {

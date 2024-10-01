@@ -1,4 +1,4 @@
-#include "ncbind/ncbind.hpp"
+#include "ncbind.hpp"
 #include "utils.hpp"
 
 //----------------------------------------------
