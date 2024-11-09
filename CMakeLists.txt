@@ -22,10 +22,12 @@ add_library(${PROJECT_NAME} SHARED
 	savetlg5.cpp
 	utils.cpp
 	Main.cpp
+	tlg5/slide.cpp
 )
 
-target_include_directories$({PROJECT_NAME} PUBLIC
+target_include_directories(${PROJECT_NAME} PUBLIC
 	LodePNG
+	${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
