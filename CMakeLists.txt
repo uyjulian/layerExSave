@@ -5,6 +5,9 @@ add_compile_options("$<$<AND:$<C_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:C>>:/utf-8
 add_compile_options("$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/utf-8>")
 add_compile_options("$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/Zc:__cplusplus>")
 
+# MSVC static runtime
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 set(PROJECT_NAME layerExSave)
 set(PROJECT_VERSION 1.00)
 
@@ -22,10 +25,12 @@ add_library(${PROJECT_NAME} SHARED
 	savetlg5.cpp
 	utils.cpp
 	Main.cpp
+	tlg5/slide.cpp
 )
 
-target_include_directories$({PROJECT_NAME} PUBLIC
+target_include_directories(${PROJECT_NAME} PUBLIC
 	LodePNG
+	${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC
