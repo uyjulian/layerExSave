@@ -73,6 +73,14 @@ class Layer {
 	function saveLayerImagePngOctet(compression_level_or_tags = 1);
 
 	/**
+	 * Province画像を保存(フォーマット：256パレット式PNG固定)　※LodePNG実装モードの時のみ有効
+	 * @param filename ファイル名
+	 * @param palette パレット情報（※将来的予約／現在未実装）
+	 * @description Province画像がない場合は例外（一度もdfProvinceに描画していないレイヤなどで発生）
+	 */
+	function saveProvinceImage(filename, palette=void);
+
+	/**
 	 * レイヤイメージをクロップ（上下左右の余白透明部分を切り取る）したときの
 	 * サイズを取得します。
 	 * @return %[ x, y, w, h] 形式の辞書，またはvoid（全部透明のとき）
@@ -106,7 +114,7 @@ class Layer {
 	/**
 	 * レイヤの淵の色を透明部分まで引き伸ばします（縮小時に偽色が出るのを防ぐ）
 	 * @param level 処理を行う回数。大きいほど引き伸ばし領域が増える
-	 * @param threshold アルファの閾値(1〜255)これより低いピクセルへ引き伸ばす
+	 * @param threshold アルファの閾値(1～255)これより低いピクセルへ引き伸ばす
 	 * @param fillColor 処理領域以外の塗りつぶし色(0xRRGGBB)
 	 */
 	function oozeColor(level, threshold=1, fillColor=0);
@@ -133,5 +141,33 @@ class Layer {
 	/**
 	 * レイヤの指定領域の平均色を返します
 	 */
-	function getAverageColor(left, top, width, height)
+	function getAverageColor(left, top, width, height);
+
+	/**
+	 * レイヤのdfMain画像のハッシュ値を返す
+	 * @param ignore_transparent : 完全透明のRGB値を無視する
+	 * @return 64bitハッシュ値
+	 * @description ハッシュはimageWidth/Heightも考慮される／同値の場合においてもgetDiffPixelなどを使って厳密に比較すること
+	 */
+	function getFingerPrintValue(ignore_transparent=true);
+
+	/**
+	 * レイヤ画像の縮小ベクトルoctetを返す
+	 * @param w, h : 縮小サイズ(w*h*4の長さのoctetが返る)
+	 * @return ベクトルoctet
+	 */
+	function getShrinkVectorOctet(w=16, h=16);
 };
+
+/**
+ * 特殊演算
+ */
+class Math {
+	/**
+	 * octetをベクトルとみなして演算
+	 * @param a, b : octet
+	 * @return [ Σ(ai*bi), Σ(ai-bi)^2, Σai^2, Σbi^2, Σai, Σbi, Σ(ai!=bi) ] or bi===voidの場合 [ 0, Σai^2, Σai^2, 0, Σai, 0, Σ(ai!=0) ]
+	 * @description 内積はr[0], ユークリッド距離は Math.sqrt(r[1])，コサイン類似度は r[0]/(sqrt(r[2])*sqrt(r[3]))
+	 */
+	function octetVectorSum(a, b = void);
+}
