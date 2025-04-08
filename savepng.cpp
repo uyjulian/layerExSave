@@ -6,7 +6,7 @@
 #define PNGTYPE_RGBA8888 (0x08060000L)
 
 //---------------------------------------------------------------------------
-// ˆ³kˆ——p
+// åœ§ç¸®å‡¦ç†ç”¨
 
 class PngChunk : public CompressBase {
 	int level;
@@ -112,13 +112,13 @@ public:
 };
 
 /**
- * ‰æ‘œî•ñ‚Ì‘‚«o‚µ
- * @param width ‰æ‘œ‰¡•
- * @param height ‰æ‘œc•
- * @param buffer ‰æ‘œƒoƒbƒtƒ@
- * @param pitch ‰æ‘œƒf[ƒ^‚Ìƒsƒbƒ`
- * @param tagsDict ƒ^ƒOî•ñ
- * @return ƒLƒƒƒ“ƒZƒ‹‚³‚ê‚½‚ç true
+ * ç”»åƒæƒ…å ±ã®æ›¸ãå‡ºã—
+ * @param width ç”»åƒæ¨ªå¹…
+ * @param height ç”»åƒç¸¦å¹…
+ * @param buffer ç”»åƒãƒãƒƒãƒ•ã‚¡
+ * @param pitch ç”»åƒãƒ‡ãƒ¼ã‚¿ã®ãƒ”ãƒƒãƒ
+ * @param tagsDict ã‚¿ã‚°æƒ…å ±
+ * @return ã‚­ãƒ£ãƒ³ã‚»ãƒ«ã•ã‚ŒãŸã‚‰ true
  */
 bool CompressPNG::compress(long width, long height, BufRefT buffer, long pitch, iTJSDispatch2 *tagsDict)
 {
@@ -242,15 +242,15 @@ static void b64e(tjs_char *p, unsigned char const *r, long len) {
 }
 
 //---------------------------------------------------------------------------
-// ƒ_ƒCƒŒƒNƒg•Û‘¶ˆ—
+// ãƒ€ã‚¤ãƒ¬ã‚¯ãƒˆä¿å­˜å‡¦ç†
 //---------------------------------------------------------------------------
 #if defined(LAYEREXSAVE_DISABLE_LODEPNG) && (LAYEREXSAVE_DISABLE_LODEPNG != 0)
 
 #pragma message( ": LodePNG *not* used." )
 
-void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, iTJSDispatch2 *info)
+void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, tTJSVariant *info)
 {
-	save(layer, filename, info);
+	save(layer, filename, info ? info->AsObjectNoAddRef() : NULL);
 }
 
 void CompressPNG::encodeToOctet(iTJSDispatch2 *layer, tTJSVariant *vclv, tTJSVariant &ret)
@@ -275,6 +275,12 @@ void CompressPNG::encodeToOctet(iTJSDispatch2 *layer, tTJSVariant *vclv, tTJSVar
 		ret = oct;
 		oct->Release();
 	}
+}
+
+bool CompressPNG::encodeProvinceImage(iTJSDispatch2 *layer, const tjs_char *filename)
+{
+	// Not Implemented
+	return false;
 }
 
 #else
@@ -304,6 +310,33 @@ static bool MakeVectorImage(iTJSDispatch2 *layer, std::vector<unsigned char> &im
 	}
 	return true;
 }
+static bool MakeVectorProvinceImage(iTJSDispatch2 *layer, std::vector<unsigned char> &image, long &width, long &height)
+{
+	BufRefT buffer;
+	long pitch;
+	if (!GetProvinceBufferAndSize(layer, width, height, buffer, pitch)) return false;
+
+	size_t len = width;
+	image.resize(len * height);
+	for(long y=0, ofs=0; y < height; y++, ofs+=len, buffer+=pitch) {
+		BufRefT p = buffer;
+		WrtRefT w = &image[ofs];
+		for(long x = 0; x < width; x++) *w++ = *p++;
+	}
+	return true;
+}
+static void MakeDefaultPalette(WrtRefT table) {
+	WrtRefT w = table;
+	static unsigned char table2bit[4] = { 0, 128, 192, 255 };
+	static unsigned char table3bit[8] = { 0, 64, 96, 128, 160, 192, 224, 255 };
+	for (int i = 0; i < 256; i++) {
+		// 8bit to 0b GGG RRR BB
+		*w++ = table3bit[((i >> 2) & 0x7)];
+		*w++ = table3bit[((i >> 5) & 0x7)];
+		*w++ = table2bit[((i     ) & 0x3)];
+		*w++ = i ? 255 : 0;
+	}
+}
 
 static unsigned CustomDeflate(unsigned char** out, size_t* outsize,
 							  const unsigned char* in, size_t insize,
@@ -328,7 +361,7 @@ static unsigned CustomDeflate(unsigned char** out, size_t* outsize,
 
 static void SetInitialState(lodepng::State &state, bool alpha)
 {
-	state.encoder.auto_convert = 0; // ©“®ƒJƒ‰[”»’èˆ—‚ğ–³Œø‰»
+	state.encoder.auto_convert = 0; // è‡ªå‹•ã‚«ãƒ©ãƒ¼åˆ¤å®šå‡¦ç†ã‚’ç„¡åŠ¹åŒ–
 	state.info_png.color.colortype = alpha ? LCT_RGBA : LCT_RGB;
 	state.info_png.color.bitdepth  = 8;
 	state.info_png.color.key_defined = 0;
@@ -348,19 +381,20 @@ static bool SetCustomChunk(lodepng::State &state, PngChunk &chunk, const char *t
 	}
 	return r;
 }
-void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, iTJSDispatch2 *info)
+
+static bool EncodeLodePNGCommon(std::vector<unsigned char> &image,
+								std::vector<unsigned char> &png,
+								long width, long height, bool alpha,
+								tTJSVariant *info)
 {
-	long width, height;
-	bool alpha;
+	lodepng::State state;
+	SetInitialState(state, alpha);
 
-	if (MakeVectorImage(layer, data, width, height, alpha)) {
-		DATA png;
-		lodepng::State state;
-		SetInitialState(state, alpha);
-
-		if (info) {
+	if (info) {
+		int comp_lv = -1;
+		if (info->Type() == tvtObject) {
 			PngChunk chunk;
-			ncbPropAccessor dic(info);
+			ncbPropAccessor dic(info->AsObjectNoAddRef());
 
 			SetCustomChunk(state, chunk, ChunkSetResoXY(dic, chunk));
 			SetCustomChunk(state, chunk, ChunkSetOffsXY(dic, chunk));
@@ -368,18 +402,31 @@ void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, i
 
 			// compression level
 			if (dic.HasValue(TJS_W("comp_lv"))) {
-				int comp_lv = (int)dic.getIntValue(TJS_W("comp_lv"), Z_DEFAULT_COMPRESSION);
-				state.encoder.zlibsettings.custom_zlib = &CustomDeflate;
-				state.encoder.zlibsettings.custom_context = (void*)comp_lv;
-				if (!comp_lv) state.encoder.filter_strategy = LFS_ZERO;
+				comp_lv = (int)dic.getIntValue(TJS_W("comp_lv"), Z_DEFAULT_COMPRESSION);
 			}
+		} else {
+			comp_lv = (int)info->AsInteger();
 		}
-		if (lodepng::encode(png, data, width, height, state) == 0) {
+		if (comp_lv >= 0) {
+			state.encoder.zlibsettings.custom_zlib = &CustomDeflate;
+			state.encoder.zlibsettings.custom_context = (void*)comp_lv;
+			if (!comp_lv) state.encoder.filter_strategy = LFS_ZERO;
+		}
+	}
+	return (lodepng::encode(png, image, width, height, state) == 0);
+}
+
+void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, tTJSVariant *info)
+{
+	long width, height;
+	bool alpha;
+
+	if (MakeVectorImage(layer, data, width, height, alpha)) {
+		DATA png;
+		if (EncodeLodePNGCommon(data, png, width, height, alpha, info)) {
 			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
 			if (!out) {
-				ttstr msg = filename;
-				msg += L":can't open";
-				TVPThrowExceptionMessage(msg.c_str());
+				TVPThrowExceptionMessage(L"%1:can't open", filename);
 			}
 			try {
 				ULONG s;
@@ -401,27 +448,7 @@ void CompressPNG::encodeToOctet(iTJSDispatch2 *layer, tTJSVariant *vclv, tTJSVar
 	ret = TJS_W("");
 	if (MakeVectorImage(layer, data, width, height, alpha)) {
 		DATA png;
-		lodepng::State state;
-		SetInitialState(state, alpha);
-		if (vclv) {
-			int comp_lv = -1;
-			if (vclv->Type() == tvtObject) {
-				PngChunk chunk;
-				ncbPropAccessor dic(vclv->AsObjectNoAddRef());
-
-				SetCustomChunk(state, chunk, ChunkSetResoXY(dic, chunk));
-				SetCustomChunk(state, chunk, ChunkSetOffsXY(dic, chunk));
-				SetCustomChunk(state, chunk, ChunkSetVpagWH(dic, chunk));
-			} else {
-				comp_lv = (int)vclv->AsInteger();
-			}
-			if (comp_lv >= 0) {
-				state.encoder.zlibsettings.custom_zlib = &CustomDeflate;
-				state.encoder.zlibsettings.custom_context = (void*)comp_lv;
-				if (!comp_lv) state.encoder.filter_strategy = LFS_ZERO;
-			}
-		}
-		if (lodepng::encode(png, data, width, height, state) == 0) {
+		if (EncodeLodePNGCommon(data, png, width, height, alpha, vclv)) {
 			tTJSVariantOctet *oct = TJSAllocVariantOctet(&png[0], png.size());
 			ret = oct;
 			oct->Release();
@@ -432,17 +459,60 @@ void CompressPNG::encodeToOctet(iTJSDispatch2 *layer, tTJSVariant *vclv, tTJSVar
 	cur = size = 0;
 }
 
+bool CompressPNG::encodeProvinceImage(iTJSDispatch2 *layer, const tjs_char *filename)
+{
+	long width, height;
+	if (MakeVectorProvinceImage(layer, data, width, height)) {
+		lodepng::State state;
+		state.info_png.color.colortype   = state.info_raw.colortype   = LCT_PALETTE;
+		state.info_png.color.bitdepth    = state.info_raw.bitdepth    = 8;
+		state.info_png.color.key_defined = state.info_raw.key_defined = 0;
+		{
+			DATA palette;
+			palette.resize(256 * 4);
+			MakeDefaultPalette(&palette[0]);
+			for (int idx = 0; idx < 256; idx++) {
+				unsigned char r = palette[idx*4 + 0],
+				/**/          g = palette[idx*4 + 1],
+				/**/          b = palette[idx*4 + 2],
+				/**/          a = palette[idx*4 + 3];
+				lodepng_palette_add(&state.info_png.color, r, g, b, a);
+				lodepng_palette_add(&state.info_raw,       r, g, b, a);
+			}
+		}
+		DATA png;
+		if (lodepng::encode(png, data, width, height, state) == 0) {
+			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
+			if (!out) {
+				ttstr msg = filename;
+				msg += L":can't open";
+				TVPThrowExceptionMessage(msg.c_str());
+			}
+			try {
+				ULONG s;
+				out->Write(&png[0], png.size(), &s);
+			} catch (...) {
+				out->Release();
+				throw;
+			}
+			out->Release();
+		}
+	} else {
+		TVPThrowExceptionMessage(TJS_W("no province image"));
+	}
+	return true;
+}
 #endif
 
 
 //---------------------------------------------------------------------------
-// ƒŒƒCƒ„Šg’£
+// ãƒ¬ã‚¤ãƒ¤æ‹¡å¼µ
 //---------------------------------------------------------------------------
 
 /**
- * PNG Œ`®‚Å‚Ì‰æ‘œ‚Ì•Û‘¶B’ˆÓ“_:ƒf[ƒ^‚Ì•Û‘¶‚ªI‚í‚é‚Ü‚Åˆ—‚ª‹A‚è‚Ü‚¹‚ñB
- * @param filename ƒtƒ@ƒCƒ‹–¼
- * @param tags ƒ^ƒOî•ñ
+ * PNG å½¢å¼ã§ã®ç”»åƒã®ä¿å­˜ã€‚æ³¨æ„ç‚¹:ãƒ‡ãƒ¼ã‚¿ã®ä¿å­˜ãŒçµ‚ã‚ã‚‹ã¾ã§å‡¦ç†ãŒå¸°ã‚Šã¾ã›ã‚“ã€‚
+ * @param filename ãƒ•ã‚¡ã‚¤ãƒ«å
+ * @param tags ã‚¿ã‚°æƒ…å ±
  */
 static tjs_error TJS_INTF_METHOD saveLayerImagePngFunc(tTJSVariant *result,
 														tjs_int numparams,
@@ -453,7 +523,7 @@ static tjs_error TJS_INTF_METHOD saveLayerImagePngFunc(tTJSVariant *result,
 	png.encodeToFile(
 		objthis, // layer
 		param[0]->GetString(),  // filename
-		numparams > 1 ? param[1]->AsObjectNoAddRef() : NULL // info
+		numparams > 1 ? param[1] : NULL // info
 		);
 	return TJS_S_OK;
 }
@@ -461,8 +531,8 @@ static tjs_error TJS_INTF_METHOD saveLayerImagePngFunc(tTJSVariant *result,
 NCB_ATTACH_FUNCTION(saveLayerImagePng,       Layer, saveLayerImagePngFunc);
 
 /**
- * PNG Œ`®‰æ‘œ‚ğoctet‚Å•Ô‚·B’ˆÓ“_:ƒf[ƒ^‚Ì•Û‘¶‚ªI‚í‚é‚Ü‚Åˆ—‚ª‹A‚è‚Ü‚¹‚ñB
- * @param compression_level ˆ³k—¦
+ * PNG å½¢å¼ç”»åƒã‚’octetã§è¿”ã™ã€‚æ³¨æ„ç‚¹:ãƒ‡ãƒ¼ã‚¿ã®ä¿å­˜ãŒçµ‚ã‚ã‚‹ã¾ã§å‡¦ç†ãŒå¸°ã‚Šã¾ã›ã‚“ã€‚
+ * @param compression_level åœ§ç¸®ç‡
  */
 static tjs_error TJS_INTF_METHOD saveLayerImagePngOctet(tTJSVariant *result,
 														tjs_int numparams,
@@ -476,4 +546,24 @@ static tjs_error TJS_INTF_METHOD saveLayerImagePngOctet(tTJSVariant *result,
 	return TJS_S_OK;
 }
 NCB_ATTACH_FUNCTION(saveLayerImagePngOctet, Layer, saveLayerImagePngOctet);
+
+/**
+ * Provinceç”»åƒã‚’ä¿å­˜(ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆï¼š256ãƒ‘ãƒ¬ãƒƒãƒˆå¼PNGå›ºå®š)
+ * @param filename ãƒ•ã‚¡ã‚¤ãƒ«å
+ * @param palette ãƒ‘ãƒ¬ãƒƒãƒˆæƒ…å ±ï¼ˆâ€»å°†æ¥çš„äºˆç´„ï¼ç¾åœ¨æœªå®Ÿè£…ï¼‰
+ */
+static tjs_error TJS_INTF_METHOD saveProvinceImageFunc(tTJSVariant *result,
+													   tjs_int numparams,
+													   tTJSVariant **param,
+													   iTJSDispatch2 *objthis)
+{
+	if (numparams < 1) return TJS_E_BADPARAMCOUNT;
+	CompressPNG png;
+	if (!png.encodeProvinceImage(
+		objthis, // layer
+		param[0]->GetString()  // filename
+		)) return TJS_E_NOTIMPL;
+	return TJS_S_OK;
+}
+NCB_ATTACH_FUNCTION(saveProvinceImage, Layer, saveProvinceImageFunc);
 
