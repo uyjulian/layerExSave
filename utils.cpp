@@ -1,6 +1,9 @@
 #include "ncbind.hpp"
 #include "utils.hpp"
 
+#include <vector>
+#include <cmath>
+
 //----------------------------------------------
 // レイヤイメージ操作ユーティリティ
 
@@ -8,7 +11,7 @@
  * レイヤのサイズとバッファを取得する
  */
 bool
-GetLayerSize(iTJSDispatch2 *lay, long &w, long &h, long &pitch)
+GetLayerSize(iTJSDispatch2 *lay, long &w, long &h, long *pitch)
 {
 	// レイヤインスタンス以外ではエラー
 	if (!lay || TJS_FAILED(lay->IsInstanceOf(0, 0, 0, TJS_W("Layer"), lay))) return false;
@@ -27,19 +30,21 @@ GetLayerSize(iTJSDispatch2 *lay, long &w, long &h, long &pitch)
 	h = (long)val.AsInteger();
 
 	// ピッチ取得
-	val.Clear();
-	if (TJS_FAILED(lay->PropGet(0, TJS_W("mainImageBufferPitch"), 0, &val, lay))) return false;
-	pitch = (long)val.AsInteger();
+	if (pitch) {
+		val.Clear();
+		if (TJS_FAILED(lay->PropGet(0, TJS_W("mainImageBufferPitch"), 0, &val, lay))) return false;
+		*pitch = (long)val.AsInteger();
+	}
 
 	// 正常な値かどうか
-	return (w > 0 && h > 0 && pitch != 0);
+	return (w > 0 && h > 0 && (!pitch || *pitch != 0));
 }
 
 // 読み込み用
 bool
 GetLayerBufferAndSize(iTJSDispatch2 *lay, long &w, long &h, BufRefT &ptr, long &pitch)
 {
-	if (!GetLayerSize(lay, w, h, pitch)) return false;
+	if (!GetLayerSize(lay, w, h, &pitch)) return false;
 
 	// バッファ取得
 	tTJSVariant val;
@@ -52,12 +57,30 @@ GetLayerBufferAndSize(iTJSDispatch2 *lay, long &w, long &h, BufRefT &ptr, long &
 bool
 GetLayerBufferAndSize(iTJSDispatch2 *lay, long &w, long &h, WrtRefT &ptr, long &pitch)
 {
-	if (!GetLayerSize(lay, w, h, pitch)) return false;
+	if (!GetLayerSize(lay, w, h, &pitch)) return false;
 
 	// バッファ取得
 	tTJSVariant val;
 	if (TJS_FAILED(lay->PropGet(0, TJS_W("mainImageBufferForWrite"), 0, &val, lay))) return false;
 	ptr = reinterpret_cast<WrtRefT>(val.AsInteger());
+	return  (ptr != 0);
+}
+
+// Province読み込み用
+bool
+GetProvinceBufferAndSize(iTJSDispatch2 *lay, long &w, long &h, BufRefT &ptr, long &pitch)
+{
+	if (!GetLayerSize(lay, w, h)) return false;
+
+	// ピッチ取得
+	tTJSVariant val;
+	if (TJS_FAILED(lay->PropGet(0, TJS_W("provinceImageBufferPitch"), 0, &val, lay))) return false;
+	pitch = (long)val.AsInteger();
+
+	// バッファ取得
+	val.Clear();
+	if (TJS_FAILED(lay->PropGet(0, TJS_W("provinceImageBuffer"), 0, &val, lay))) return false;
+	ptr = reinterpret_cast<BufRefT>(val.AsInteger());
 	return  (ptr != 0);
 }
 
@@ -296,7 +319,11 @@ static inline void AddColor(DWORD &r, DWORD &g, DWORD &b, BufRefT p) {
  * 
  * Layer.oozeColor = function(level, threshold=1);
  * @param level 処理を行う回数。大きいほど引き伸ばし領域が増える
+<<<<<<< HEAD
  * @param threshold アルファの閾値(1〜255)これより低いピクセルへ引き伸ばす
+=======
+ * @param threshold アルファの閾値(1～255)これより低いピクセルへ引き伸ばす
+>>>>>>> work
  * @param fillColor 処理領域以外の塗りつぶし色
  */
 static tjs_error TJS_INTF_METHOD
@@ -582,3 +609,187 @@ getAverageColor(tTJSVariant *result, tjs_int numparams, tTJSVariant **param, iTJ
 
 NCB_ATTACH_FUNCTION(getAverageColor, Layer, getAverageColor);
 
+/**
+ * Layer.getFingerPrintValue = function(ignore_transparent=true);
+ * 比較用のハッシュ値を返す（同値の場合においてもgetDiffPixelなどを使って厳密に比較すること）
+ */
+#define FNV_1A_BASIS64 (0xCBF29CE484222325uLL)
+#define FNV_1A_PRIME64 (0x00000100000001B3uLL)
+static inline tjs_uint64 fnv_1a_hash(tjs_uint8 n, tjs_uint64 hash) { return (hash ^ n) * FNV_1A_PRIME64; }
+static tjs_error TJS_INTF_METHOD
+GetFingerPrintValue(tTJSVariant *result, tjs_int numparams, tTJSVariant **param, iTJSDispatch2 *lay)
+{
+	BufRefT src = 0;
+	long w, h, nl, nc = 4;
+	if (!GetLayerBufferAndSize(lay, w, h, src, nl))
+		TVPThrowExceptionMessage(TJS_W("Invalid layer image."));
+
+	// 完全透明カラーの比較有無
+	const bool lazy = (numparams > 0 && param[0]->Type() != tvtVoid) ? param[0]->operator bool() : true;
+
+	tjs_uint64 hash = FNV_1A_BASIS64;
+
+	for (long y = 0; y < h; ++y, src += nl) {
+		BufRefT p = src;
+		if (lazy) {
+			for (long x = 0; x < w; ++x,p+=nc) {
+				if (p[3]) {
+					hash = fnv_1a_hash(p[0], hash);
+					hash = fnv_1a_hash(p[1], hash);
+					hash = fnv_1a_hash(p[2], hash);
+					hash = fnv_1a_hash(p[3], hash);
+				} else {
+					hash = fnv_1a_hash(0, hash);
+					hash = fnv_1a_hash(0, hash);
+					hash = fnv_1a_hash(0, hash);
+					hash = fnv_1a_hash(0, hash);
+				}
+			}
+		} else {
+			for (long x = 0; x < w; ++x,p+=nc) {
+				hash = fnv_1a_hash(p[0], hash);
+				hash = fnv_1a_hash(p[1], hash);
+				hash = fnv_1a_hash(p[2], hash);
+				hash = fnv_1a_hash(p[3], hash);
+			}
+		}
+	}
+	// 最後に大きさを混ぜる
+	for (int i = 24; i >= 0; i-=8) {
+		hash = fnv_1a_hash((w >> i) & 255, hash);
+		hash = fnv_1a_hash((h >> i) & 255, hash);
+	}
+	if (result) *result = (tTVInteger)hash;
+	return TJS_S_OK;
+}
+
+NCB_ATTACH_FUNCTION(getFingerPrintValue, Layer, GetFingerPrintValue);
+
+
+/**
+ * Layer.getShrinkVectorOctet = function(w, h);
+ * 縮小ベクトルを返す
+ */
+static inline DWORD calcBlockSum(BufRefT src, long const w, long const h, long const nc, long const nl) {
+	DWORD s[4] = {0,0,0,0}, total = 0;
+	for (long y = 0; y < h; ++y, src += nl) {
+		BufRefT p = src;
+		for (long x = 0; x < w; ++x,p+=nc,++total) {
+			if (p[3]) s[0]+=p[0], s[1]+=p[1], s[2]+=p[2], s[3]+=p[3];
+		}
+	}
+	DWORD const bias = total>>1;
+	return (((((s[0] + bias) / total) & 0xFF)      ) |
+			((((s[1] + bias) / total) & 0xFF) <<  8) |
+			((((s[2] + bias) / total) & 0xFF) << 16) |
+			((((s[3] + bias) / total) & 0xFF) << 24));
+}
+static tjs_error TJS_INTF_METHOD
+GetShrinkVectorOctet(tTJSVariant *result, tjs_int numparams, tTJSVariant **param, iTJSDispatch2 *lay)
+{
+	const tjs_int svw = (numparams > 0 && param[0]->Type() != tvtVoid) ? (tjs_int)*param[0] : 16;
+	const tjs_int svh = (numparams > 1 && param[1]->Type() != tvtVoid) ? (tjs_int)*param[1] : 16;
+	if (svw <= 0 || svh < 0) return TJS_E_INVALIDPARAM;
+
+	BufRefT src = 0;
+	long w, h, nl, nc = 4;
+	if (!GetLayerBufferAndSize(lay, w, h, src, nl))
+		TVPThrowExceptionMessage(TJS_W("Invalid layer image."));
+
+	const long step_w = (w + svw - 1)/ svw;
+	const long step_h = (h + svh - 1)/ svh;
+	const long next_block = nc * step_w;
+	const long next_line  = nl * step_h;
+
+	std::vector<DWORD> vector;
+	for (long y = 0; y < h; y+=step_h, src += next_line) {
+		BufRefT p = src;
+		const long bh = (h - y) > step_h ? step_h : (h - y);
+		for (long x = 0; x < w; x+=step_w,p+=next_block) {
+			const long bw = (w - x) > step_w ? step_w : (w - x);
+			vector.push_back(calcBlockSum(p, bw, bh, nc, nl));
+		}
+	}
+	if (result) *result = tTJSVariant(reinterpret_cast<tjs_uint8*>(&vector.front()), (tjs_uint)(vector.size() * sizeof(DWORD)));
+	return TJS_S_OK;
+}
+NCB_ATTACH_FUNCTION(getShrinkVectorOctet, Layer, GetShrinkVectorOctet);
+
+/**
+ * Math.octetDot = function(oct_a,oct_b);
+ * octetの各要素を0-255のベクトルとみなして内積を取る
+ */
+template <typename T>
+struct VectorSumWork {
+	T csum, dsum, nsum1, nsum2, psum1, psum2;
+	size_t diff;
+	VectorSumWork() : csum((T)0), dsum((T)0), nsum1((T)0), nsum2((T)0), psum1((T)0), psum2((T)0), diff(0) {}
+};
+template <typename T>
+static inline bool octetVectorSum(tTJSVariant const *v1, tTJSVariant const *v2, VectorSumWork<T> &work)
+{
+	if (!v1 || v1->Type() != tvtOctet) return false;
+
+	tTJSVariantOctet *oct1 = v1->AsOctetNoAddRef();
+	tTJSVariantOctet *oct2 = (v2 && v2->Type() == tvtOctet) ? v2->AsOctetNoAddRef() : 0;
+	if (!oct1) return false;
+	if (!oct2) {
+		tjs_uint const sz = oct1->GetLength();
+		const tjs_uint8 *a = oct1->GetData();
+		if (!a) return false;
+		for (tjs_uint n = 0; n < sz; ++n) {
+			T const va = (T)a[n];
+			work.dsum  += va * va;
+			work.nsum1 += va;
+			if (a[n] != 0) ++work.diff;
+		}
+		work.psum1 = work.dsum;
+	} else {
+		tjs_uint const sz1 = oct1->GetLength();
+		tjs_uint const sz2 = oct2->GetLength();
+		if (sz1 != sz2) return false;
+
+		const tjs_uint8 *a = oct1->GetData();
+		const tjs_uint8 *b = oct2->GetData();
+		if (!a || !b) return false;
+		for (tjs_uint n = 0; n < sz1; ++n) {
+			T const va = (T)a[n];
+			T const vb = (T)b[n];
+			T const vd = (va > vb) ? (va - vb) : (vb - va);
+			work.csum  += va * vb;
+			work.dsum  += vd * vd;
+			work.nsum1 += va;
+			work.nsum2 += vb;
+			work.psum1 += va * va;
+			work.psum2 += vb * vb;
+			if (a[n] != b[n]) ++work.diff;
+		}
+	}
+	return true;
+}
+static tjs_error TJS_INTF_METHOD
+MathOctetVectorSum(tTJSVariant *result, tjs_int numparams, tTJSVariant **param, iTJSDispatch2 *obj)
+{
+	if (numparams < 2) return TJS_E_BADPARAMCOUNT;
+
+	VectorSumWork<tTVInteger> work;
+	if (!octetVectorSum(param[0], param[1], work)) return TJS_E_INVALIDPARAM;
+
+	if (result) {
+		tTJSVariant v;
+		iTJSDispatch2 *arr = TJSCreateArrayObject();
+		if (!arr) return TJS_E_FAIL;
+		v = (tTVInteger)work.diff;
+		/**/            arr->PropSetByNum(TJS_MEMBERENSURE, 6, &v, arr);
+		v = work.csum;  arr->PropSetByNum(TJS_MEMBERENSURE, 0, &v, arr);
+		v = work.dsum;  arr->PropSetByNum(TJS_MEMBERENSURE, 1, &v, arr);
+		v = work.psum1; arr->PropSetByNum(TJS_MEMBERENSURE, 2, &v, arr);
+		v = work.psum2; arr->PropSetByNum(TJS_MEMBERENSURE, 3, &v, arr);
+		v = work.nsum1; arr->PropSetByNum(TJS_MEMBERENSURE, 4, &v, arr);
+		v = work.nsum2; arr->PropSetByNum(TJS_MEMBERENSURE, 5, &v, arr);
+		*result = tTJSVariant(arr, arr);
+		arr->Release();
+	}
+	return TJS_S_OK;
+}
+NCB_ATTACH_FUNCTION(octetVectorSum, Math, MathOctetVectorSum);
