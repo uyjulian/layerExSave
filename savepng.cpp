@@ -350,7 +350,7 @@ static unsigned CustomDeflate(unsigned char** out, size_t* outsize,
 							  const unsigned char* in, size_t insize,
 							  const LodePNGCompressSettings* settings)
 {
-	tjs_intptr_t comp_lv = settings ? (tjs_intptr_t)settings->custom_context : 1; //Z_DEFAULT_COMPRESSION;
+	int comp_lv = settings ? (int)(tjs_intptr_t)settings->custom_context : 1; //Z_DEFAULT_COMPRESSION;
 
 	std::vector<BYTE> data;
 	long size = PngChunk::Deflate(data, in, insize, comp_lv);
