@@ -342,7 +342,7 @@ static unsigned CustomDeflate(unsigned char** out, size_t* outsize,
 							  const unsigned char* in, size_t insize,
 							  const LodePNGCompressSettings* settings)
 {
-	int comp_lv = settings ? (int)settings->custom_context : 1; //Z_DEFAULT_COMPRESSION;
+	int comp_lv = settings ? (int)(tjs_intptr_t)settings->custom_context : 1; //Z_DEFAULT_COMPRESSION;
 
 	std::vector<BYTE> data;
 	long size = PngChunk::Deflate(data, in, insize, comp_lv);
@@ -409,7 +409,7 @@ static bool EncodeLodePNGCommon(std::vector<unsigned char> &image,
 		}
 		if (comp_lv >= 0) {
 			state.encoder.zlibsettings.custom_zlib = &CustomDeflate;
-			state.encoder.zlibsettings.custom_context = (void*)comp_lv;
+			state.encoder.zlibsettings.custom_context = (void*)(tjs_intptr_t)comp_lv;
 			if (!comp_lv) state.encoder.filter_strategy = LFS_ZERO;
 		}
 	}
