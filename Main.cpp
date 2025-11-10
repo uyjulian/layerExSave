@@ -66,14 +66,14 @@ protected:
 	// 経過イベント送信
 	void eventProgress(iTJSDispatch2 *objthis) {
 		tTJSVariant *vars[] = {&handler, &progressPercent, &layer, &filename};
-		objthis->FuncCall(0, L"onSaveLayerImageProgress", NULL, NULL, 4, vars, objthis);
+		objthis->FuncCall(0, TJS_W("onSaveLayerImageProgress"), NULL, NULL, 4, vars, objthis);
 	}
 
 	// 終了イベント送信
 	void eventDone(iTJSDispatch2 *objthis) {
 		tTJSVariant result = canceled ? 1 : 0;
 		tTJSVariant *vars[] = {&handler, &result, &layer, &filename};
-		objthis->FuncCall(0, L"onSaveLayerImageDone", NULL, NULL, 4, vars, objthis);
+		objthis->FuncCall(0, TJS_W("onSaveLayerImageDone"), NULL, NULL, 4, vars, objthis);
 	}
 	
 public:
@@ -165,8 +165,8 @@ protected:
 		tTJSVariant proc     = (tTVInteger)(tjs_intptr_t)receiver;
 		tTJSVariant userdata = (tTVInteger)(tjs_intptr_t)objthis;
 		tTJSVariant *p[] = {&mode, &proc, &userdata};
-		if (objthis->FuncCall(0, L"registerMessageReceiver", NULL, NULL, 4, p, objthis) != TJS_S_OK) {
-			TVPThrowExceptionMessage(L"can't regist user message receiver");
+		if (objthis->FuncCall(0, TJS_W("registerMessageReceiver"), NULL, NULL, 4, p, objthis) != TJS_S_OK) {
+			TVPThrowExceptionMessage(TJS_W("can't regist user message receiver"));
 		}
 	}
 
@@ -231,7 +231,7 @@ public:
 			// 新しいレイヤを生成
 			tTJSVariant window(objthis, objthis);
 			tTJSVariant primaryLayer;
-			objthis->PropGet(0, L"primaryLayer", NULL, &primaryLayer, objthis);
+			objthis->PropGet(0, TJS_W("primaryLayer"), NULL, &primaryLayer, objthis);
 			tTJSVariant *vars[] = {&window, &primaryLayer};
 			iTJSDispatch2 *obj;
 			if (TJS_SUCCEEDED(getLayerClass()->CreateNew(0, NULL, NULL, &obj, 2, vars, objthis))) {
@@ -239,7 +239,7 @@ public:
 				// 名前づけ
 				tTJSVariant name = "saveLayer:";
 				name +=filename;
-				obj->PropSet(0, L"name", NULL, &name, obj);
+				obj->PropSet(0, TJS_W("name"), NULL, &name, obj);
 
 				// 元レイヤの画像を複製
 				tTJSVariant *param[] = {&layer};
@@ -248,10 +248,10 @@ public:
 					obj->Release();
 				} else {
 					obj->Release();
-					TVPThrowExceptionMessage(L"保存処理用レイヤへの画像の複製に失敗しました");
+					TVPThrowExceptionMessage(TJS_W("保存処理用レイヤへの画像の複製に失敗しました"));
 				}
 			} else {
-				TVPThrowExceptionMessage(L"保存処理用レイヤの生成に失敗しました");
+				TVPThrowExceptionMessage(TJS_W("保存処理用レイヤの生成に失敗しました"));
 			}
 		}
 		SaveInfo *saveInfo = new SaveInfo(handler, this, newLayer, filename, info);
