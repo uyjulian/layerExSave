@@ -60,7 +60,7 @@ public:
 		z_stream zs;
 		ZeroMemory(&zs, sizeof(zs));
 		if (::deflateInit(&zs, level) != Z_OK)
-			TVPThrowExceptionMessage(L"deflate initialize");
+			TVPThrowExceptionMessage(TJS_W("deflate initialize"));
 
 		int s = Z_OK, f = Z_NO_FLUSH;
 		bool canceled = false;
@@ -434,7 +434,7 @@ void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, t
 		if (EncodeLodePNGCommon(data, png, width, height, alpha, info)) {
 			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
 			if (!out) {
-				TVPThrowExceptionMessage(L"%1:can't open", filename);
+				TVPThrowExceptionMessage(TJS_W("%1:can't open"), filename);
 			}
 			try {
 				ULONG s;
@@ -493,7 +493,7 @@ bool CompressPNG::encodeProvinceImage(iTJSDispatch2 *layer, const tjs_char *file
 			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
 			if (!out) {
 				ttstr msg = filename;
-				msg += L":can't open";
+				msg += TJS_W(":can't open");
 				TVPThrowExceptionMessage(msg.c_str());
 			}
 			try {

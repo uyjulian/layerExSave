@@ -158,7 +158,7 @@ public:
 		long width, height, pitch;
 		if (!GetLayerBufferAndSize(layer, width, height, buffer, pitch)) {
 			ttstr msg = filename;
-			msg += L":invalid layer";
+			msg += TJS_W(":invalid layer");
 			TVPThrowExceptionMessage(msg.c_str());
 		}
 		bool canceled = compress(width, height, buffer, pitch, info);
@@ -168,7 +168,7 @@ public:
 			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
 			if (!out) {
 				ttstr msg = filename;
-				msg += L":can't open";
+				msg += TJS_W(":can't open");
 				TVPThrowExceptionMessage(msg.c_str());
 			}
 			try {

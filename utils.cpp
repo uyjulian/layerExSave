@@ -575,7 +575,7 @@ getAverageColor(tTJSVariant *result, tjs_int numparams, tTJSVariant **param, iTJ
 
 	// 範囲チェック
 	if (width <= 0 || height <= 0) 
-		TVPThrowExceptionMessage(L"invalid layer range");
+		TVPThrowExceptionMessage(TJS_W("invalid layer range"));
 
 	double a = 0;
 	double r = 0;
