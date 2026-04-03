@@ -432,17 +432,34 @@ void CompressPNG::encodeToFile(iTJSDispatch2 *layer, const tjs_char *filename, t
 	if (MakeVectorImage(layer, data, width, height, alpha)) {
 		DATA png;
 		if (EncodeLodePNGCommon(data, png, width, height, alpha, info)) {
+#if 0
 			iTJSBinaryStream *out = TVPCreateStream(filename, TJS_BS_WRITE);
+#else
+			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
+#endif
 			if (!out) {
 				TVPThrowExceptionMessage(TJS_W("%1:can't open"), filename);
 			}
 			try {
+#if 0
 				out->Write(&png[0], png.size());
+#else
+				ULONG s;
+				out->Write(&png[0], png.size(), &s);
+#endif
 			} catch (...) {
+#if 0
 				out->Destruct();
+#else
+				out->Release();
+#endif
 				throw;
 			}
+#if 0
 			out->Destruct();
+#else
+			out->Release();
+#endif
 		}
 	}
 }
@@ -489,19 +506,36 @@ bool CompressPNG::encodeProvinceImage(iTJSDispatch2 *layer, const tjs_char *file
 		}
 		DATA png;
 		if (lodepng::encode(png, data, width, height, state) == 0) {
+#if 0
 			iTJSBinaryStream *out = TVPCreateStream(filename, TJS_BS_WRITE);
+#else
+			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
+#endif
 			if (!out) {
 				ttstr msg = filename;
 				msg += TJS_W(":can't open");
 				TVPThrowExceptionMessage(msg.c_str());
 			}
 			try {
+#if 0
 				out->Write(&png[0], png.size());
+#else
+				ULONG s;
+				out->Write(&png[0], png.size(), &s);
+#endif
 			} catch (...) {
+#if 0
 				out->Destruct();
+#else
+				out->Release();
+#endif
 				throw;
 			}
+#if 0
 			out->Destruct();
+#else
+			out->Release();
+#endif
 		}
 	} else {
 		TVPThrowExceptionMessage(TJS_W("no province image"));

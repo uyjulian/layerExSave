@@ -133,9 +133,16 @@ public:
 	 * データをファイルに書き出す
 	 * @param out 出力先ストリーム
 	 */
+#if 0
 	void store(iTJSBinaryStream *out) {
 		out->Write(&data[0], size);
 	}
+#else
+	void store(IStream *out) {
+		ULONG s;
+		out->Write(&data[0], size, &s);
+	}
+#endif
 
 	/**
 	 * 圧縮処理
@@ -164,7 +171,11 @@ public:
 
 		// 圧縮がキャンセルされていなければファイル保存
 		if (!canceled) {
+#if 0
 			iTJSBinaryStream *out = TVPCreateStream(filename, TJS_BS_WRITE);
+#else
+			IStream *out = TVPCreateIStream(filename, TJS_BS_WRITE);
+#endif
 			if (!out) {
 				ttstr msg = filename;
 				msg += TJS_W(":can't open");
@@ -174,10 +185,18 @@ public:
 				// 格納
 				store(out);
 			} catch (...) {
+#if 0
 				out->Destruct();
+#else
+				out->Release();
+#endif
 				throw;
 			}
+#if 0
 			out->Destruct();
+#else
+			out->Release();
+#endif
 		}
 
 		return canceled;
