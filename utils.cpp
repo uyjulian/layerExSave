@@ -4,6 +4,12 @@
 #include <vector>
 #include <cmath>
 
+#if !defined(_WIN32)
+// generic(非Windows)ビルドでは windows.h が無いため DWORD が未定義。
+// このファイルでは 32bit 符号なし整数の別名としてのみ使用しているので補う。
+typedef tjs_uint32 DWORD;
+#endif
+
 //----------------------------------------------
 // レイヤイメージ操作ユーティリティ
 

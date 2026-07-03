@@ -1,10 +1,13 @@
 #include "ncbind.hpp"
 #include <vector>
 using namespace std;
-#include <process.h>
+#include <thread>
 
-#define WM_SAVE_TLG_PROGRESS (WM_APP+4)
-#define WM_SAVE_TLG_DONE     (WM_APP+5)
+// TVP_WM_USER は全バリアント共通のユーザメッセージ基点 (0x8000。tp_stub.h が
+// WIN/Generic 双方で定義)。ここのメッセージは registerMessageReceiver で登録した
+// receiver に TVPPostWindowMessage 経由で配信される。
+#define WM_SAVE_TLG_PROGRESS (TVP_WM_USER+4)
+#define WM_SAVE_TLG_DONE     (TVP_WM_USER+5)
 
 iTJSDispatch2 *getLayerClass(void)
 {
@@ -140,19 +143,19 @@ protected:
 	/*
 	 * ウインドウイベント処理レシーバ
 	 */
-	static bool __stdcall receiver(void *userdata, tTVPWindowMessage *Message) {
+	static bool STDCALL receiver(void *userdata, tTVPWindowMessage *Message) {
 		if (Message->Msg == WM_SAVE_TLG_PROGRESS) {
 			iTJSDispatch2 *obj = (iTJSDispatch2*)userdata;
 			WindowSaveImage *self = ncbInstanceAdaptor<WindowSaveImage>::GetNativeInstance(obj);
 			if (self) {
-				self->eventProgress((SaveInfo*)Message->WParam);
+				self->eventProgress(reinterpret_cast<SaveInfo*>((tjs_intptr_t)Message->WParam));
 			}
 			return true;
 		} else if (Message->Msg == WM_SAVE_TLG_DONE) {
 			iTJSDispatch2 *obj = (iTJSDispatch2*)userdata;
 			WindowSaveImage *self = ncbInstanceAdaptor<WindowSaveImage>::GetNativeInstance(obj);
 			if (self) {
-				self->eventDone((SaveInfo*)Message->WParam);
+				self->eventDone(reinterpret_cast<SaveInfo*>((tjs_intptr_t)Message->WParam));
 			}
 			return true;
 		}
@@ -196,15 +199,16 @@ public:
 	/**
 	 * メッセージ送信
 	 * @param msg メッセージ
-	 * @param wparam WPARAM
-	 * @param lparam LPARAM
+	 * @param wparam WParam
+	 * @param lparam LParam
 	 */
-	void postMessage(UINT msg, WPARAM wparam=NULL, LPARAM lparam=NULL) {
-		// ウィンドウハンドルを取得して通知
+	void postMessage(tjs_uint32 msg, tjs_uint64 wparam=0, tjs_uint64 lparam=0) {
+		// ウィンドウハンドルを取得して receiver chain へ非同期通知
+		// (WIN では ::PostMessage、Generic では Application 経由の receiver 配信)
 		tTJSVariant val;
 		objthis->PropGet(0, TJS_W("HWND"), NULL, &val, objthis);
-		HWND hwnd = reinterpret_cast<HWND>((tjs_intptr_t)(val));
-		::PostMessage(hwnd, msg, wparam, lparam);
+		void *handle = reinterpret_cast<void*>((tjs_intptr_t)(val));
+		TVPPostWindowMessage(handle, msg, wparam, lparam);
 	}
 
 	/**
@@ -256,7 +260,7 @@ public:
 		}
 		SaveInfo *saveInfo = new SaveInfo(handler, this, newLayer, filename, info);
 		saveinfos[handler] = saveInfo;
-		_beginthread(checkThread, 0, saveInfo);
+		std::thread(checkThread, saveInfo).detach();
 		return handler;
 	}
 	
@@ -291,8 +295,8 @@ SaveInfo::progress(int percent)
 	if ((int)progressPercent != percent) {
 		progressPercent = percent;
 		if (notify) {
-			notify->postMessage(WM_SAVE_TLG_PROGRESS, (WPARAM)this);
-			Sleep(0);
+			notify->postMessage(WM_SAVE_TLG_PROGRESS, (tjs_uint64)(tjs_intptr_t)this);
+			std::this_thread::yield();
 		}
 	}
 	return canceled;
@@ -317,8 +321,8 @@ SaveInfo::start()
 	}
 	// 完了通知
 	if (notify) {
-		notify->postMessage(WM_SAVE_TLG_DONE, (WPARAM)this);
-		Sleep(0);
+		notify->postMessage(WM_SAVE_TLG_DONE, (tjs_uint64)(tjs_intptr_t)this);
+		std::this_thread::yield();
 	} else {
 		delete this;
 	}
