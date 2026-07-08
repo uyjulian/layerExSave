@@ -13,7 +13,7 @@ using namespace std;
 #endif
 
 #ifndef TVPPostWindowMessage
-#define TVPPostWindowMessage(...) ::PostMessage(__VA_ARGS__)
+#define TVPPostWindowMessage(handle, ...) ::PostMessage((HWND)handle, __VA_ARGS__)
 #endif
 
 // TVP_WM_USER は全バリアント共通のユーザメッセージ基点 (0x8000。tp_stub.h が
