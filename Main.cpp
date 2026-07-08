@@ -3,6 +3,19 @@
 using namespace std;
 #include <thread>
 
+#ifndef TVP_WM_USER
+#include <process.h>
+#define TVP_WM_USER WM_APP
+#endif
+
+#ifndef STDCALL
+#define STDCALL __stdcall
+#endif
+
+#ifndef TVPPostWindowMessage
+#define TVPPostWindowMessage(...) ::PostMessage(__VA_ARGS__)
+#endif
+
 // TVP_WM_USER は全バリアント共通のユーザメッセージ基点 (0x8000。tp_stub.h が
 // WIN/Generic 双方で定義)。ここのメッセージは registerMessageReceiver で登録した
 // receiver に TVPPostWindowMessage 経由で配信される。
